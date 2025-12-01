@@ -88,7 +88,7 @@ const AuctionDetail = () => {
 
     // Show notification if not the bidder
     if (data.bid.bidder._id !== user?._id) {
-      toast.info(`New bid: $${data.bid.amount.toFixed(2)} by ${data.bid.bidder.username}`);
+      toast.info(`New bid: rs${data.bid.amount.toFixed(2)} by ${data.bid.bidder.username}`);
     }
   };
 
@@ -113,7 +113,7 @@ const AuctionDetail = () => {
     const minBid = auction.currentBid + auction.minimumIncrement;
 
     if (amount < minBid) {
-      toast.error(`Minimum bid is $${minBid.toFixed(2)}`);
+      toast.error(`Minimum bid is rs${minBid.toFixed(2)}`);
       return;
     }
 
