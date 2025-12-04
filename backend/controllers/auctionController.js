@@ -275,3 +275,35 @@ exports.getWatchedAuctions = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// @desc    Mark/Unmark interest in an auction
+// @route   POST /api/auctions/:id/interest
+// @access  Private
+exports.toggleInterest = async (req, res) => {
+  try {
+    const auction = await Auction.findById(req.params.id);
+
+    if (!auction) {
+      return res.status(404).json({ message: 'Auction not found' });
+    }
+
+    const isInterested = auction.interestedUsers.includes(req.user._id);
+
+    if (isInterested) {
+      auction.interestedUsers = auction.interestedUsers.filter(
+        (id) => id.toString() !== req.user._id.toString()
+      );
+    } else {
+      auction.interestedUsers.push(req.user._id);
+    }
+
+    await auction.save();
+
+    res.json({
+      isInterested: !isInterested,
+      interestCount: auction.interestedUsers.length,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

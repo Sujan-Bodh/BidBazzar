@@ -85,7 +85,7 @@ const socketHandler = (io) => {
         timestamp: new Date(),
       });
 
-      console.log(`New bid on auction ${auctionId}: $${bid.amount} by ${socket.username}`);
+      console.log(`New bid on auction ${auctionId}: ₹${bid.amount} by ${socket.username}`);
     });
 
     // Handle auction update
@@ -124,10 +124,32 @@ const socketHandler = (io) => {
     socket.on('chatMessage', (data) => {
       const { auctionId, message } = data;
 
+      // Broadcast the saved message object to the auction room
       io.to(`auction-${auctionId}`).emit('newChatMessage', {
-        username: socket.username,
-        userId: socket.userId,
-        message,
+        ...message,
+        auctionId,
+        timestamp: new Date(),
+      });
+    });
+
+    // Handle private messages: server will relay to recipient if connected
+    socket.on('privateMessage', (data) => {
+      const { recipientId, message } = data;
+
+      // Emit to recipient if they're connected
+      if (recipientId && connectedUsers.has(recipientId)) {
+        const recipientSocketId = connectedUsers.get(recipientId);
+        io.to(recipientSocketId).emit('newPrivateMessage', {
+          ...message,
+          recipientId,
+          timestamp: new Date(),
+        });
+      }
+
+      // Also emit back to sender to confirm delivery
+      socket.emit('newPrivateMessage', {
+        ...message,
+        recipientId,
         timestamp: new Date(),
       });
     });
@@ -137,6 +159,18 @@ const socketHandler = (io) => {
       const { auctionId } = data;
       socket.to(`auction-${auctionId}`).emit('userTyping', {
         username: socket.username,
+      });
+    });
+
+    // Handle user interest toggle
+    socket.on('userInterested', (data) => {
+      const { auctionId, userId, username, isInterested, interestCount } = data;
+      io.to(`auction-${auctionId}`).emit('userInterested', {
+        userId,
+        username,
+        isInterested,
+        interestCount,
+        timestamp: new Date(),
       });
     });
 

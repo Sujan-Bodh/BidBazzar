@@ -5,6 +5,8 @@ import socketService from '../../utils/socket';
 import { useAuth } from '../../context/AuthContext';
 import CountdownTimer from '../common/CountdownTimer';
 import LoadingSpinner from '../common/LoadingSpinner';
+import ChatBox from '../chat/ChatBox';
+import PrivateChatBox from '../chat/PrivateChatBox';
 import { toast } from 'react-toastify';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -20,6 +22,9 @@ const AuctionDetail = () => {
   const [placingBid, setPlacingBid] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
   const [isWatching, setIsWatching] = useState(false);
+  const [isInterested, setIsInterested] = useState(false);
+  const [interestCount, setInterestCount] = useState(0);
+  const [showPrivateChat, setShowPrivateChat] = useState(false);
 
   useEffect(() => {
     fetchAuctionDetails();
@@ -34,12 +39,22 @@ const AuctionDetail = () => {
       socketService.onBidPlaced(handleBidPlaced);
       socketService.onAuctionEnded(handleAuctionEnded);
       socketService.onViewerCount(setViewerCount);
+      socketService.onUserInterested((data) => {
+        if (data.auctionId === id || data.auctionId === undefined) {
+          setInterestCount(data.interestCount);
+          // Optional toast when another user marks interest
+          if (data.userId !== user?._id) {
+            toast.info(`${data.username} ${data.isInterested ? 'is interested' : 'is no longer interested'} in this auction`);
+          }
+        }
+      });
 
       return () => {
         socketService.leaveAuction(id);
         socketService.offBidPlaced();
         socketService.offAuctionEnded();
         socketService.offViewerCount();
+        socketService.offUserInterested();
       };
     }
   }, [id]);
@@ -49,6 +64,8 @@ const AuctionDetail = () => {
       const response = await auctionAPI.getAuctionById(id);
       setAuction(response.data);
       setIsWatching(response.data.watchers?.includes(user?._id));
+      setIsInterested(response.data.interestedUsers?.includes(user?._id));
+      setInterestCount(response.data.interestedUsers?.length || 0);
 
       // Set initial bid amount to minimum bid
       const minBid = response.data.currentBid + response.data.minimumIncrement;
@@ -75,20 +92,21 @@ const AuctionDetail = () => {
     setAuction((prev) => ({
       ...prev,
       currentBid: data.auction.currentBid,
-      currentWinner: data.auction.currentWinner,
+      // prefer populated bidder object if available, otherwise fallback to auction.currentWinner
+      currentWinner: data.bid?.bidder || data.auction.currentWinner,
       totalBids: data.auction.totalBids,
     }));
 
     // Add bid to history
     setBids((prev) => [data.bid, ...prev]);
 
-    // Update minimum bid amount
-    const minBid = data.auction.currentBid + auction.minimumIncrement;
+    // Update minimum bid amount using data from socket event
+    const minBid = data.auction.currentBid + (data.auction.minimumIncrement || auction?.minimumIncrement || 0);
     setBidAmount(minBid.toFixed(2));
 
     // Show notification if not the bidder
     if (data.bid.bidder._id !== user?._id) {
-      toast.info(`New bid: rs${data.bid.amount.toFixed(2)} by ${data.bid.bidder.username}`);
+      toast.info(`New bid: ₹${data.bid.amount.toFixed(2)} by ${data.bid.bidder.username}`);
     }
   };
 
@@ -113,7 +131,7 @@ const AuctionDetail = () => {
     const minBid = auction.currentBid + auction.minimumIncrement;
 
     if (amount < minBid) {
-      toast.error(`Minimum bid is rs${minBid.toFixed(2)}`);
+      toast.error(`Minimum bid is ₹${minBid.toFixed(2)}`);
       return;
     }
 
@@ -147,7 +165,7 @@ const AuctionDetail = () => {
       return;
     }
 
-    if (window.confirm(`Buy this item now for $${auction.buyNowPrice.toFixed(2)}?`)) {
+  if (window.confirm(`Buy this item now for ₹${auction.buyNowPrice.toFixed(2)}?`)) {
       try {
         await bidAPI.buyNow(id);
         toast.success('Purchase successful! Check your dashboard.');
@@ -175,6 +193,36 @@ const AuctionDetail = () => {
     }
   };
 
+  const handleToggleInterest = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to mark interest');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const response = await auctionAPI.toggleInterest(id);
+      setIsInterested(response.data.isInterested);
+      setInterestCount(response.data.interestCount);
+
+      // Emit socket event so other viewers update quickly
+      const socket = socketService.getSocket();
+      if (socket) {
+        socket.emit('userInterested', {
+          auctionId: id,
+          userId: user?._id,
+          username: user?.username || 'Someone',
+          isInterested: response.data.isInterested,
+          interestCount: response.data.interestCount,
+        });
+      }
+
+      toast.success(response.data.isInterested ? 'Marked as interested' : 'Removed interest');
+    } catch (error) {
+      toast.error('Failed to update interest');
+    }
+  };
+
   if (loading) {
     return <LoadingSpinner fullScreen />;
   }
@@ -187,7 +235,7 @@ const AuctionDetail = () => {
   const canBid = isAuthenticated && !isOwner && auction.status === 'active';
   const imageUrl = auction.images?.[0]
     ? `http://localhost:5000${auction.images[0]}`
-    : 'https://via.placeholder.com/600x400?text=No+Image';
+    : '/no-image.svg';
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -202,7 +250,7 @@ const AuctionDetail = () => {
                 alt={auction.title}
                 className="w-full h-96 object-cover rounded-lg"
                 onError={(e) => {
-                  e.target.src = 'https://via.placeholder.com/600x400?text=No+Image';
+                  e.target.src = '/no-image.svg';
                 }}
               />
               {auction.images?.length > 1 && (
@@ -213,6 +261,7 @@ const AuctionDetail = () => {
                       src={`http://localhost:5000${img}`}
                       alt={`${auction.title} ${index + 1}`}
                       className="w-20 h-20 object-cover rounded cursor-pointer hover:opacity-75"
+                      onError={(e) => { e.target.src = '/no-image.svg'; }}
                     />
                   ))}
                 </div>
@@ -243,6 +292,9 @@ const AuctionDetail = () => {
                 <div>
                   <p className="text-sm text-gray-500">Seller</p>
                   <p className="font-medium">{auction.seller?.username}</p>
+                  {isAuthenticated && !isOwner && (
+                    <button onClick={() => setShowPrivateChat((s) => !s)} className="text-sm text-primary-600 mt-2 underline">Message Seller</button>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Location</p>
@@ -252,7 +304,7 @@ const AuctionDetail = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Shipping Cost</p>
-                  <p className="font-medium">${auction.shippingCost?.toFixed(2) || '0.00'}</p>
+                  <p className="font-medium">₹{auction.shippingCost?.toFixed(2) || '0.00'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Total Bids</p>
@@ -280,9 +332,7 @@ const AuctionDetail = () => {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-bold text-primary-600">
-                          ${bid.amount.toFixed(2)}
-                        </p>
+                        <p className="text-lg font-bold text-primary-600">₹{bid.amount.toFixed(2)}</p>
                         {bid.isWinning && (
                           <span className="text-xs text-green-600 font-medium">Winning</span>
                         )}
@@ -292,6 +342,18 @@ const AuctionDetail = () => {
                 </div>
               )}
             </div>
+
+            {/* Chat Box */}
+            <div className="mt-6">
+              <ChatBox auctionId={id} />
+            </div>
+
+            {/* Private Chat (toggle) */}
+            {showPrivateChat && (
+              <div className="mt-4">
+                <PrivateChatBox otherUserId={auction.seller?._id} otherUsername={auction.seller?.username} />
+              </div>
+            )}
           </div>
 
           {/* Sidebar - Right Side */}
@@ -309,9 +371,7 @@ const AuctionDetail = () => {
 
               <div className="mb-6">
                 <p className="text-sm text-gray-500 mb-1">Current Bid</p>
-                <p className="text-4xl font-bold text-primary-600">
-                  ${auction.currentBid?.toFixed(2)}
-                </p>
+                <p className="text-4xl font-bold text-primary-600">₹{auction.currentBid?.toFixed(2)}</p>
                 {auction.currentWinner && (
                   <p className="text-sm text-gray-600 mt-1">
                     Leading: {auction.currentWinner.username || 'Anonymous'}
@@ -326,7 +386,7 @@ const AuctionDetail = () => {
                       Your Bid Amount
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2 text-gray-500">$</span>
+                      <span className="absolute left-3 top-2 text-gray-500">₹</span>
                       <input
                         type="number"
                         step="0.01"
@@ -336,8 +396,8 @@ const AuctionDetail = () => {
                         required
                       />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Minimum: ${(auction.currentBid + auction.minimumIncrement).toFixed(2)}
+                      <p className="text-xs text-gray-500 mt-1">
+                      Minimum: ₹{(auction.currentBid + auction.minimumIncrement).toFixed(2)}
                     </p>
                   </div>
 
@@ -348,15 +408,18 @@ const AuctionDetail = () => {
               )}
 
               {auction.buyNowPrice && auction.status === 'active' && !isOwner && (
-                <button onClick={handleBuyNow} className="btn-secondary w-full mt-4">
-                  Buy Now - ${auction.buyNowPrice.toFixed(2)}
-                </button>
+                <button onClick={handleBuyNow} className="btn-secondary w-full mt-4">Buy Now - ₹{auction.buyNowPrice.toFixed(2)}</button>
               )}
 
               {isAuthenticated && !isOwner && (
-                <button onClick={handleToggleWatch} className="btn-secondary w-full mt-4">
-                  {isWatching ? '★ Watching' : '☆ Watch This Auction'}
-                </button>
+                <>
+                  <button onClick={handleToggleWatch} className="btn-secondary w-full mt-4">
+                    {isWatching ? '★ Watching' : '☆ Watch This Auction'}
+                  </button>
+                  <button onClick={handleToggleInterest} className="btn-primary w-full mt-2">
+                    {isInterested ? `✓ Interested (${interestCount})` : `I'm Interested (${interestCount})`}
+                  </button>
+                </>
               )}
 
               {!isAuthenticated && (

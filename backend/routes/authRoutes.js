@@ -3,6 +3,8 @@ const router = express.Router();
 const {
   register,
   login,
+  verifyEmail,
+  resendOTP,
   getProfile,
   updateProfile,
 } = require('../controllers/authController');
@@ -14,6 +16,8 @@ const registerValidation = [
   body('username').trim().isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters'),
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('phone').notEmpty().withMessage('Phone number is required'),
+  body('address').notEmpty().withMessage('Address is required'),
 ];
 
 const loginValidation = [
@@ -24,9 +28,12 @@ const loginValidation = [
 // Public routes
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
+router.post('/verify-email', verifyEmail);
+router.post('/resend-otp', resendOTP);
 
 // Protected routes
 router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateProfile);
 
 module.exports = router;
+

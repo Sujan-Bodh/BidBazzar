@@ -88,7 +88,19 @@ export const AuthProvider = ({ children }) => {
     toast.info('Logged out successfully');
   };
 
-  const updateUser = async (userData) => {
+  const updateUser = (userData) => {
+    // This is used after OTP verification during login
+    // Just set the user data directly without making API call
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+
+    // Connect socket if token is present
+    if (userData.token) {
+      socketService.connect(userData.token);
+    }
+  };
+
+  const updateProfile = async (userData) => {
     try {
       const response = await authAPI.updateProfile(userData);
       const updatedUser = response.data;
@@ -112,6 +124,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     updateUser,
+    updateProfile,
     isAuthenticated: !!user,
   };
 

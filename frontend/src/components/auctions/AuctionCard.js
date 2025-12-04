@@ -5,7 +5,7 @@ import CountdownTimer from '../common/CountdownTimer';
 const AuctionCard = ({ auction }) => {
   const imageUrl = auction.images?.[0]
     ? `http://localhost:5000${auction.images[0]}`
-    : 'https://via.placeholder.com/400x300?text=No+Image';
+    : '/no-image.svg';
 
   const getStatusBadge = () => {
     switch (auction.status) {
@@ -30,7 +30,7 @@ const AuctionCard = ({ auction }) => {
             alt={auction.title}
             className="w-full h-full object-cover"
             onError={(e) => {
-              e.target.src = 'https://via.placeholder.com/400x300?text=No+Image';
+              e.target.src = '/no-image.svg';
             }}
           />
           <div className="absolute top-2 right-2">
@@ -62,16 +62,12 @@ const AuctionCard = ({ auction }) => {
             <div className="flex justify-between items-center mb-2">
               <div>
                 <p className="text-xs text-gray-500">Current Bid</p>
-                <p className="text-2xl font-bold text-primary-600">
-                  ${auction.currentBid?.toFixed(2) || auction.startingBid?.toFixed(2)}
-                </p>
+                <p className="text-2xl font-bold text-primary-600">₹{auction.currentBid?.toFixed(2) || auction.startingBid?.toFixed(2)}</p>
               </div>
               {auction.buyNowPrice && (
                 <div className="text-right">
                   <p className="text-xs text-gray-500">Buy Now</p>
-                  <p className="text-lg font-semibold text-gray-700">
-                    ${auction.buyNowPrice.toFixed(2)}
-                  </p>
+                  <p className="text-lg font-semibold text-gray-700">₹{auction.buyNowPrice.toFixed(2)}</p>
                 </div>
               )}
             </div>

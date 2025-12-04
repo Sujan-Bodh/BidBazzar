@@ -14,11 +14,12 @@ import AuctionList from './components/auctions/AuctionList';
 import AuctionDetail from './components/auctions/AuctionDetail';
 import CreateAuction from './components/auctions/CreateAuction';
 import Dashboard from './components/dashboard/Dashboard';
+import Profile from './components/profile/Profile';
 
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="min-h-screen bg-gray-50">
           <Navbar />
           <Routes>
@@ -34,6 +35,30 @@ function App() {
               element={
                 <PrivateRoute>
                   <Dashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/dashboard/buyer"
+              element={
+                <PrivateRoute>
+                  <Dashboard role="buyer" />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/dashboard/seller"
+              element={
+                <PrivateRoute>
+                  <Dashboard role="seller" />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <PrivateRoute>
+                  <Profile />
                 </PrivateRoute>
               }
             />

@@ -8,6 +8,7 @@ const {
   deleteAuction,
   getUserAuctions,
   toggleWatch,
+  toggleInterest,
   getWatchedAuctions,
 } = require('../controllers/auctionController');
 const { protect } = require('../middleware/auth');
@@ -24,5 +25,6 @@ router.delete('/:id', protect, deleteAuction);
 router.get('/user/selling', protect, getUserAuctions);
 router.get('/user/watching', protect, getWatchedAuctions);
 router.post('/:id/watch', protect, toggleWatch);
+router.post('/:id/interest', protect, toggleInterest);
 
 module.exports = router;

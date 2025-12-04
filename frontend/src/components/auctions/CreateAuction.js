@@ -215,7 +215,7 @@ const CreateAuction = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Starting Bid (₨) *
+                  Starting Bid (₹) *
                 </label>
                 <input
                   type="number"
@@ -232,7 +232,7 @@ const CreateAuction = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Minimum Increment (₨) *
+                  Minimum Increment (₹) *
                 </label>
                 <input
                   type="number"
@@ -249,7 +249,7 @@ const CreateAuction = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Buy Now Price (₨)
+                  Buy Now Price (₹)
                 </label>
                 <input
                   type="number"
@@ -283,7 +283,7 @@ const CreateAuction = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Shipping Cost (₨)
+                  Shipping Cost (₹)
                 </label>
                 <input
                   type="number"

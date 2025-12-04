@@ -36,7 +36,7 @@ exports.placeBid = async (req, res) => {
     const minimumBid = auction.currentBid + auction.minimumIncrement;
     if (amount < minimumBid) {
       return res.status(400).json({
-        message: `Bid must be at least $${minimumBid.toFixed(2)}`,
+        message: `Bid must be at least ₹${minimumBid.toFixed(2)}`,
         minimumBid,
       });
     }
@@ -85,7 +85,8 @@ exports.placeBid = async (req, res) => {
       auction: {
         _id: auction._id,
         currentBid: auction.currentBid,
-        currentWinner: auction.currentWinner,
+        // return populated bidder object so clients can read username immediately
+        currentWinner: populatedBid.bidder,
         totalBids: auction.totalBids,
       },
     });
@@ -135,10 +136,19 @@ exports.buyNow = async (req, res) => {
     auction.totalBids += 1;
     await auction.save();
 
+    // populate bid bidder for client convenience
+    const populatedBid = await Bid.findById(bid._id).populate('bidder', 'username');
+
     res.json({
       message: 'Item purchased successfully',
-      bid,
-      auction,
+      bid: populatedBid,
+      auction: {
+        _id: auction._id,
+        currentBid: auction.currentBid,
+        currentWinner: populatedBid.bidder,
+        status: auction.status,
+        totalBids: auction.totalBids,
+      },
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

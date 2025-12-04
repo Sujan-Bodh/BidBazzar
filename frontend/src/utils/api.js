@@ -44,6 +44,11 @@ export const authAPI = {
     return api.post('/auth/register', userData);
   },
   login: (credentials) => api.post('/auth/login', credentials),
+  verifyEmail: (data) => api.post('/auth/verify-email', data),
+  verifyPhone: (data) => api.post('/auth/verify-phone', data),
+  resendOTP: (data) => api.post('/auth/resend-otp', data),
+  verifyLoginOTP: (data) => api.post('/auth/verify-login-otp', data),
+  resendLoginOTP: (data) => api.post('/auth/resend-login-otp', data),
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (userData) => api.put('/auth/profile', userData),
 };
@@ -64,7 +69,19 @@ export const auctionAPI = {
   getUserAuctions: () => api.get('/auctions/user/selling'),
   getWatchedAuctions: () => api.get('/auctions/user/watching'),
   toggleWatch: (id) => api.post(`/auctions/${id}/watch`),
+  toggleInterest: (id) => api.post(`/auctions/${id}/interest`),
 };
+
+// Chat API
+export const chatAPI = {
+  getMessages: (auctionId) => api.get(`/chats/auction/${auctionId}`),
+  sendMessage: (auctionId, content) => api.post(`/chats/auction/${auctionId}`, { content }),
+};
+
+// Private chat API between users
+chatAPI.getPrivateMessages = (userId) => api.get(`/chats/private/${userId}`);
+chatAPI.sendPrivateMessage = (userId, content) => api.post(`/chats/private/${userId}`, { content, recipientId: userId });
+chatAPI.getConversations = () => api.get('/chats/conversations');
 
 // Bid API
 export const bidAPI = {

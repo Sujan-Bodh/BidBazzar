@@ -92,6 +92,12 @@ const auctionSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    interestedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     condition: {
       type: String,
       enum: ['New', 'Like New', 'Good', 'Fair', 'Poor'],

@@ -85,6 +85,74 @@ class SocketService {
     }
   }
 
+  onUserInterested(callback) {
+    if (this.socket) {
+      this.socket.on('userInterested', callback);
+    }
+  }
+
+  // Chat helpers
+  emitChatMessage(auctionId, message) {
+    if (this.socket) {
+      this.socket.emit('chatMessage', { auctionId, message });
+    }
+  }
+
+  onNewChatMessage(callback) {
+    if (this.socket) {
+      this.socket.on('newChatMessage', callback);
+    }
+  }
+
+  offNewChatMessage() {
+    if (this.socket) {
+      this.socket.off('newChatMessage');
+    }
+  }
+
+  emitTyping(auctionId) {
+    if (this.socket) {
+      this.socket.emit('typing', { auctionId });
+    }
+  }
+
+  onUserTyping(callback) {
+    if (this.socket) {
+      this.socket.on('userTyping', callback);
+    }
+  }
+
+  offUserTyping() {
+    if (this.socket) {
+      this.socket.off('userTyping');
+    }
+  }
+
+  // Private chat helpers
+  emitPrivateMessage(recipientId, message) {
+    if (this.socket) {
+      this.socket.emit('privateMessage', { recipientId, message });
+    }
+  }
+
+  onNewPrivateMessage(callback) {
+    if (this.socket) {
+      this.socket.on('newPrivateMessage', callback);
+    }
+  }
+
+  offNewPrivateMessage() {
+    if (this.socket) {
+      this.socket.off('newPrivateMessage');
+    }
+  }
+
+  offUserInterested() {
+    if (this.socket) {
+      this.socket.off('userInterested');
+    }
+  }
+
   offBidPlaced() {
     if (this.socket) {
       this.socket.off('bidPlaced');
