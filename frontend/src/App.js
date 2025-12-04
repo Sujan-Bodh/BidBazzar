@@ -4,6 +4,7 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider } from './context/AuthContext';
+import NotificationProvider from './context/NotificationContext';
 import Navbar from './components/layout/Navbar';
 import PrivateRoute from './components/common/PrivateRoute';
 
@@ -18,8 +19,9 @@ import Profile from './components/profile/Profile';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <NotificationProvider>
+      <AuthProvider>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="min-h-screen bg-gray-50">
           <Navbar />
           <Routes>
@@ -85,8 +87,9 @@ function App() {
             pauseOnHover
           />
         </div>
-      </Router>
-    </AuthProvider>
+        </Router>
+      </AuthProvider>
+    </NotificationProvider>
   );
 }
 

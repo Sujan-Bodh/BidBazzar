@@ -93,4 +93,10 @@ export const bidAPI = {
   getUserWonAuctions: () => api.get('/bids/user/won'),
 };
 
+// Order API
+export const orderAPI = {
+  payOrder: (orderId) => api.post(`/orders/${orderId}/pay`),
+  getMyOrders: () => api.get('/orders/my'),
+};
+
 export default api;

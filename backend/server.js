@@ -52,6 +52,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/auctions', require('./routes/auctionRoutes'));
 app.use('/api/bids', require('./routes/bidRoutes'));
 app.use('/api/chats', require('./routes/chatRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
 
 // Health check route
 app.get('/api/health', (req, res) => {

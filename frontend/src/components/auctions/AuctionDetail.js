@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { auctionAPI, bidAPI } from '../../utils/api';
+import { auctionAPI, bidAPI, orderAPI } from '../../utils/api';
 import socketService from '../../utils/socket';
 import { useAuth } from '../../context/AuthContext';
 import CountdownTimer from '../common/CountdownTimer';
@@ -19,12 +19,15 @@ const AuctionDetail = () => {
   const [bids, setBids] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bidAmount, setBidAmount] = useState('');
+  const [maxAutoBid, setMaxAutoBid] = useState('');
   const [placingBid, setPlacingBid] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
   const [isWatching, setIsWatching] = useState(false);
   const [isInterested, setIsInterested] = useState(false);
   const [interestCount, setInterestCount] = useState(0);
   const [showPrivateChat, setShowPrivateChat] = useState(false);
+  const [orderForAuction, setOrderForAuction] = useState(null);
+  const [orderLoading, setOrderLoading] = useState(false);
 
   useEffect(() => {
     fetchAuctionDetails();
@@ -70,6 +73,20 @@ const AuctionDetail = () => {
       // Set initial bid amount to minimum bid
       const minBid = response.data.currentBid + response.data.minimumIncrement;
       setBidAmount(minBid.toFixed(2));
+      setMaxAutoBid('');
+      // If auction ended, load user's order (if any)
+      if (response.data.status === 'ended' && isAuthenticated) {
+        try {
+          setOrderLoading(true);
+          const ordersRes = await orderAPI.getMyOrders();
+          const myOrder = ordersRes.data.find((o) => String(o.auction._id || o.auction) === String(id));
+          if (myOrder) setOrderForAuction(myOrder);
+        } catch (err) {
+          console.error('Failed to load orders', err);
+        } finally {
+          setOrderLoading(false);
+        }
+      }
     } catch (error) {
       toast.error('Failed to load auction details');
       navigate('/');
@@ -137,7 +154,11 @@ const AuctionDetail = () => {
 
     try {
       setPlacingBid(true);
-      const response = await bidAPI.placeBid(id, { amount });
+      const payload = { amount };
+      if (maxAutoBid && parseFloat(maxAutoBid) > amount) {
+        payload.maxAutoBid = parseFloat(maxAutoBid);
+      }
+      const response = await bidAPI.placeBid(id, payload);
 
       // Emit socket event
       const socket = socketService.getSocket();
@@ -174,6 +195,22 @@ const AuctionDetail = () => {
         const message = error.response?.data?.message || 'Failed to complete purchase';
         toast.error(message);
       }
+    }
+  };
+
+  const handlePayOrder = async () => {
+    if (!orderForAuction) return;
+    try {
+      setOrderLoading(true);
+      await orderAPI.payOrder(orderForAuction._id);
+      toast.success('Payment recorded. Order paid.');
+      // refresh auction and order
+      fetchAuctionDetails();
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to mark order as paid';
+      toast.error(message);
+    } finally {
+      setOrderLoading(false);
     }
   };
 
@@ -399,12 +436,38 @@ const AuctionDetail = () => {
                       <p className="text-xs text-gray-500 mt-1">
                       Minimum: ₹{(auction.currentBid + auction.minimumIncrement).toFixed(2)}
                     </p>
+                    <div className="mt-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Max Auto Bid (Proxy) ₹ (optional)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={maxAutoBid}
+                        onChange={(e) => setMaxAutoBid(e.target.value)}
+                        className="input-field"
+                        placeholder="Set maximum automatic bid"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">If set, the system will auto-bid up to this amount for you.</p>
+                    </div>
                   </div>
 
                   <button type="submit" disabled={placingBid} className="btn-primary w-full">
                     {placingBid ? 'Placing Bid...' : 'Place Bid'}
                   </button>
                 </form>
+              )}
+
+              {/* Order / Payment Actions for winner */}
+              {auction.status === 'ended' && orderForAuction && (
+                <div className="mt-4 p-4 border rounded-lg">
+                  <p className="font-medium">Order Amount: ₹{orderForAuction.amount.toFixed(2)}</p>
+                  <p className="text-sm text-gray-500">Status: {orderForAuction.status}</p>
+                  {orderForAuction.status === 'pending_payment' && String(orderForAuction.buyer) === String(user?._id) && (
+                    <button onClick={handlePayOrder} disabled={orderLoading} className="btn-primary w-full mt-3">
+                      {orderLoading ? 'Processing...' : 'Mark as Paid'}
+                    </button>
+                  )}
+                </div>
               )}
 
               {auction.buyNowPrice && auction.status === 'active' && !isOwner && (

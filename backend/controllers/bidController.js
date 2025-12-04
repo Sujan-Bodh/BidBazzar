@@ -48,36 +48,98 @@ exports.placeBid = async (req, res) => {
       });
     }
 
-    // Create bid
-    const bid = await Bid.create({
+    // Create incoming bid record (manual or automatic)
+    const incomingBid = await Bid.create({
       auction: auctionId,
       bidder: bidderId,
       amount,
-      isWinning: true,
+      isWinning: false, // will set below after recalculation
       isAutomatic: !!maxAutoBid,
       maxAutoBid: maxAutoBid || null,
     });
 
-    // Mark previous winning bids as not winning
-    await Bid.updateMany(
-      {
-        auction: auctionId,
-        _id: { $ne: bid._id },
-        isWinning: true,
-      },
-      { isWinning: false }
-    );
+    // Recalculate auction winner using proxy bidding rules
+    // 1) Fetch highest manual bid (non-automatic)
+    // 2) Fetch automatic bidders' maxAutoBid
+    const allBids = await Bid.find({ auction: auctionId });
+
+    let highestManual = { amount: auction.currentBid || auction.startingBid, bidder: auction.currentWinner };
+    allBids.forEach((b) => {
+      if (!b.isAutomatic && (!highestManual.amount || b.amount > highestManual.amount)) {
+        highestManual = { amount: b.amount, bidder: b.bidder };
+      }
+    });
+
+    // Build map of automatic bidders to their maxAutoBid (take highest per bidder)
+    const autoMap = new Map();
+    allBids.forEach((b) => {
+      if (b.isAutomatic && b.maxAutoBid && b.maxAutoBid > 0) {
+        const prev = autoMap.get(String(b.bidder));
+        if (!prev || b.maxAutoBid > prev) {
+          autoMap.set(String(b.bidder), b.maxAutoBid);
+        }
+      }
+    });
+
+    // Convert autoMap to sorted array of { bidder, max }
+    const autos = Array.from(autoMap.entries()).map(([bidder, max]) => ({ bidder, max }));
+    autos.sort((a, b) => b.max - a.max);
+
+    let newCurrentBid = auction.currentBid || auction.startingBid;
+    let newWinner = auction.currentWinner;
+
+    if (autos.length === 0) {
+      // No autos, highest manual wins if above current
+      if (highestManual.amount > newCurrentBid) {
+        newCurrentBid = highestManual.amount;
+        newWinner = highestManual.bidder;
+      }
+    } else {
+      // There are automatic bidders
+      const top = autos[0];
+      const second = autos[1] ? autos[1].max : Math.max(newCurrentBid, highestManual.amount || 0);
+
+      // Candidate new bid is min(top.max, second + increment)
+      const candidate = Math.min(top.max, second + auction.minimumIncrement);
+
+      // Compare with highest manual as well
+      const effectiveManual = highestManual.amount || 0;
+      if (effectiveManual >= candidate) {
+        // Manual bidder outbids autos
+        newCurrentBid = effectiveManual;
+        newWinner = highestManual.bidder;
+      } else {
+        // Top auto wins at candidate amount
+        newCurrentBid = candidate;
+        newWinner = top.bidder;
+
+        // Create an automatic bid record representing the auto-bid if not the same as incoming
+        // Only create if top bidder isn't the incoming bid or incoming didn't already set that amount
+        if (String(newWinner) !== String(incomingBid.bidder) || incomingBid.amount !== newCurrentBid) {
+          await Bid.create({
+            auction: auctionId,
+            bidder: newWinner,
+            amount: newCurrentBid,
+            isWinning: true,
+            isAutomatic: true,
+            maxAutoBid: top.max,
+          });
+        }
+      }
+    }
+
+    // Update bids isWinning flags
+    await Bid.updateMany({ auction: auctionId }, { isWinning: false });
+    await Bid.updateOne({ _id: incomingBid._id }, { isWinning: true });
 
     // Update auction
-    auction.currentBid = amount;
-    auction.currentWinner = bidderId;
-    auction.totalBids += 1;
+    auction.currentBid = newCurrentBid;
+    auction.currentWinner = newWinner;
+    auction.totalBids = (auction.totalBids || 0) + 1;
     await auction.save();
 
-    // Populate bid details
-    const populatedBid = await Bid.findById(bid._id)
-      .populate('bidder', 'username')
-      .populate('auction', 'title');
+    // Populate incoming bid for response
+    const populatedBid = await Bid.findById(incomingBid._id).populate('bidder', 'username');
 
     res.status(201).json({
       message: 'Bid placed successfully',
@@ -85,8 +147,7 @@ exports.placeBid = async (req, res) => {
       auction: {
         _id: auction._id,
         currentBid: auction.currentBid,
-        // return populated bidder object so clients can read username immediately
-        currentWinner: populatedBid.bidder,
+        currentWinner: auction.currentWinner,
         totalBids: auction.totalBids,
       },
     });

@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import socketService from '../../utils/socket';
+import { useNotificationDispatch, addNotification } from '../../context/NotificationContext';
+import NotificationIcon from '../notifications/NotificationIcon';
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -10,6 +13,88 @@ const Navbar = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  // Internal manager to wire socket events into notifications
+  const NotificationManager = () => {
+    const dispatch = useNotificationDispatch();
+
+    useEffect(() => {
+      if (!isAuthenticated || !user) return;
+
+      const token = user.token;
+      socketService.connect(token);
+
+      const onAuctionEnded = (payload) => {
+        addNotification(dispatch, {
+          type: 'auction',
+          title: 'Auction Ended',
+          message: payload?.title || 'An auction has ended',
+          data: payload,
+        });
+      };
+
+      const onAuctionWon = (payload) => {
+        addNotification(dispatch, {
+          type: 'order',
+          title: 'You Won an Auction',
+          message: payload?.title || 'You won an auction. Check your orders.',
+          data: payload,
+        });
+      };
+
+      const onUserInterested = (payload) => {
+        addNotification(dispatch, {
+          type: 'interest',
+          title: 'Someone is Interested',
+          message: payload?.message || 'A user showed interest in your item',
+          data: payload,
+        });
+      };
+
+      const onPrivateMessage = (payload) => {
+        addNotification(dispatch, {
+          type: 'message',
+          title: payload?.fromName ? `Message from ${payload.fromName}` : 'New message',
+          message: payload?.text || 'You have a new message',
+          data: payload,
+        });
+      };
+
+      socketService.onAuctionEnded(onAuctionEnded);
+      socketService.onAuctionWon(onAuctionWon);
+      socketService.onUserInterested(onUserInterested);
+      socketService.onNewPrivateMessage(onPrivateMessage);
+      socketService.onOrderOfferedToNext((payload) => {
+        addNotification(dispatch, {
+          type: 'order',
+          title: 'Order Offered To You',
+          message: payload?.message || 'An order was offered to the next bidder',
+          data: payload,
+        });
+      });
+
+      socketService.onAuctionUnsold((payload) => {
+        addNotification(dispatch, {
+          type: 'auction',
+          title: 'Auction Unsold',
+          message: payload?.message || 'An auction finished without a sale',
+          data: payload,
+        });
+      });
+
+      return () => {
+        socketService.offAuctionEnded && socketService.offAuctionEnded();
+        socketService.offAuctionUpdated && socketService.offAuctionUpdated();
+        socketService.offBidPlaced && socketService.offBidPlaced();
+        socketService.offNewPrivateMessage && socketService.offNewPrivateMessage();
+        socketService.offUserInterested && socketService.offUserInterested();
+        socketService.offOrderOfferedToNext && socketService.offOrderOfferedToNext();
+        socketService.offAuctionUnsold && socketService.offAuctionUnsold();
+      };
+    }, [isAuthenticated, user, addNotification]);
+
+    return null;
   };
 
   return (
@@ -52,13 +137,17 @@ const Navbar = () => {
           <div className="hidden md:flex md:items-center md:space-x-4">
             {isAuthenticated ? (
               <>
-                <span className="text-gray-700">Hello, {user?.username}</span>
-                <Link to="/profile" className="btn-secondary">
-                  Profile
-                </Link>
-                <button onClick={handleLogout} className="btn-primary">
-                  Logout
-                </button>
+                <>
+                  <NotificationManager />
+                  <span className="text-gray-700">Hello, {user?.username}</span>
+                  <NotificationIcon />
+                  <Link to="/profile" className="btn-secondary">
+                    Profile
+                  </Link>
+                  <button onClick={handleLogout} className="btn-primary">
+                    Logout
+                  </button>
+                </>
               </>
             ) : (
               <>

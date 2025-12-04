@@ -79,6 +79,18 @@ class SocketService {
     }
   }
 
+  onOrderOfferedToNext(callback) {
+    if (this.socket) {
+      this.socket.on('orderOfferedToNext', callback);
+    }
+  }
+
+  onAuctionUnsold(callback) {
+    if (this.socket) {
+      this.socket.on('auctionUnsold', callback);
+    }
+  }
+
   onViewerCount(callback) {
     if (this.socket) {
       this.socket.on('viewerCount', callback);
@@ -162,6 +174,18 @@ class SocketService {
   offAuctionUpdated() {
     if (this.socket) {
       this.socket.off('auctionUpdated');
+    }
+  }
+
+  offOrderOfferedToNext() {
+    if (this.socket) {
+      this.socket.off('orderOfferedToNext');
+    }
+  }
+
+  offAuctionUnsold() {
+    if (this.socket) {
+      this.socket.off('auctionUnsold');
     }
   }
 

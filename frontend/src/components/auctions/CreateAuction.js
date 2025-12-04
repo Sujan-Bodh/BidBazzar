@@ -29,6 +29,7 @@ const CreateAuction = () => {
     condition: 'Good',
     startingBid: '',
     minimumIncrement: '1',
+    reservePrice: '',
     buyNowPrice: '',
     endTime: '',
     shippingCost: '0',
@@ -101,6 +102,9 @@ const CreateAuction = () => {
       data.append('condition', formData.condition);
       data.append('startingBid', formData.startingBid);
       data.append('minimumIncrement', formData.minimumIncrement);
+      if (formData.reservePrice) {
+        data.append('reservePrice', formData.reservePrice);
+      }
       data.append('endTime', formData.endTime);
       data.append('shippingCost', formData.shippingCost);
       data.append('location', JSON.stringify(formData.location));
@@ -244,6 +248,22 @@ const CreateAuction = () => {
                   onChange={handleChange}
                   className="input-field"
                   placeholder="1.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reserve Price (₹)
+                </label>
+                <input
+                  type="number"
+                  name="reservePrice"
+                  step="0.01"
+                  min="0"
+                  value={formData.reservePrice}
+                  onChange={handleChange}
+                  className="input-field"
+                  placeholder="Optional"
                 />
               </div>
 

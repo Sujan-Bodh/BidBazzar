@@ -52,6 +52,12 @@ const auctionSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    // Optional reserve price (hidden minimum seller will accept)
+    reservePrice: {
+      type: Number,
+      default: 0,
+      min: [0, 'Reserve price must be non-negative'],
+    },
     startTime: {
       type: Date,
       required: true,
