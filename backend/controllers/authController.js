@@ -69,10 +69,16 @@ exports.register = async (req, res) => {
 
     await user.save();
 
-    // Send OTP via email
-    await sendOTPviaEmail(email, emailOTP);
+    // Send OTP via email (don't fail registration if email sending fails)
+    let emailSent = true;
+    try {
+      await sendOTPviaEmail(email, emailOTP);
+    } catch (err) {
+      emailSent = false;
+      console.error('Error sending OTP email during registration:', err.message || err);
+    }
 
-    res.status(201).json({
+    const resp = {
       _id: user._id,
       username: user.username,
       email: user.email,
@@ -80,7 +86,13 @@ exports.register = async (req, res) => {
       message: 'Registration successful! Please verify your email to activate your account.',
       verificationRequired: true,
       requiresEmailVerification: true,
-    });
+    };
+
+    if (!emailSent) {
+      resp.warning = 'OTP email could not be sent. You can request a resend.';
+    }
+
+    res.status(201).json(resp);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -179,12 +191,22 @@ exports.resendOTP = async (req, res) => {
     };
 
     await user.save();
-    await sendOTPviaEmail(email, emailOTP);
 
-    res.json({
-      message: `OTP resent to ${email}`,
-      otp: emailOTP, // Remove in production
-    });
+    let emailSent = true;
+    try {
+      await sendOTPviaEmail(email, emailOTP);
+    } catch (err) {
+      emailSent = false;
+      console.error('Error sending OTP email during resend:', err.message || err);
+    }
+
+    const resp = { message: `OTP resent to ${email}` };
+    if (process.env.NODE_ENV === 'development') resp.otp = emailOTP; // only in dev
+    if (!emailSent) {
+      resp.warning = 'OTP email could not be sent. Please check email settings or try again later.';
+    }
+
+    res.json(resp);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

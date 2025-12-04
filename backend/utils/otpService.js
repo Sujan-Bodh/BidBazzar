@@ -80,12 +80,54 @@ const sendOTPviaEmail = async (email, otp) => {
       const errorMessage = err?.response?.body?.errors?.[0]?.message || err?.message || 'Unknown error';
       console.error(`Failed to send email to ${email}: ${errorMessage}`);
 
+      // Try SMTP fallback if SMTP config is present
+      console.warn('SendGrid failed, attempting SMTP fallback if configured...');
+      if (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS) {
+        try {
+          const nodemailer = require('nodemailer');
+          const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT, 10),
+            secure: process.env.SMTP_SECURE === 'true',
+            auth: {
+              user: process.env.SMTP_USER,
+              pass: process.env.SMTP_PASS,
+            },
+          });
+
+          const mailOptions = {
+            from: process.env.SENDGRID_FROM_EMAIL || process.env.SMTP_FROM_EMAIL || 'no-reply@bidbazzar.local',
+            to: email,
+            subject: 'Your BidBazaar verification code',
+            text: `Your verification code is ${otp}. It expires in 5 minutes.`,
+            html: `
+              <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">BidBazaar Email Verification</h2>
+                <p>Your verification code is:</p>
+                <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; margin: 20px 0;">
+                  ${otp}
+                </div>
+                <p style="color: #666;">This code will expire in 5 minutes.</p>
+                <p style="color: #666; font-size: 12px;">If you didn't request this code, please ignore this email.</p>
+              </div>
+            `,
+          };
+
+          const info = await transporter.sendMail(mailOptions);
+          console.log(`✅ SMTP Email sent to ${email}. MessageId: ${info.messageId}`);
+          return { success: true, message: `OTP sent to ${email}` };
+        } catch (smtpErr) {
+          console.error('❌ SMTP fallback failed:', smtpErr?.message || smtpErr);
+          // continue to development fallback below
+        }
+      }
+
       // In development, also log the OTP for testing
       if (process.env.NODE_ENV === 'development') {
         console.log(`📧 Email OTP (for testing) to ${email}: ${otp}`);
       }
 
-      // Throw the error so the controller can handle it
+      // Throw the error so the controller can handle it (but include details)
       throw new Error(`Email sending failed: ${errorMessage}`);
     }
   }

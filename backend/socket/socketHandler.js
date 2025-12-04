@@ -38,6 +38,8 @@ const socketHandler = (io) => {
     // Store user connection
     if (socket.userId) {
       connectedUsers.set(socket.userId, socket.id);
+      // Join a user-specific room to simplify private delivery
+      socket.join(`user-${socket.userId}`);
     }
 
     // Join auction room
@@ -135,18 +137,18 @@ const socketHandler = (io) => {
     // Handle private messages: server will relay to recipient if connected
     socket.on('privateMessage', (data) => {
       const { recipientId, message } = data;
+      console.log(`Private message from ${socket.userId || 'Guest'} to ${recipientId}:`, message && (message._id || message.id || message.content || message.text));
 
-      // Emit to recipient if they're connected
-      if (recipientId && connectedUsers.has(recipientId)) {
-        const recipientSocketId = connectedUsers.get(recipientId);
-        io.to(recipientSocketId).emit('newPrivateMessage', {
+      // Emit to recipient's personal room (works even if they have multiple sockets)
+      if (recipientId) {
+        io.to(`user-${recipientId}`).emit('newPrivateMessage', {
           ...message,
           recipientId,
           timestamp: new Date(),
         });
       }
 
-      // Also emit back to sender to confirm delivery
+      // Emit back to sender to confirm delivery/echo
       socket.emit('newPrivateMessage', {
         ...message,
         recipientId,
