@@ -43,9 +43,14 @@ const OTPVerification = ({ email, onVerificationComplete, loading }) => {
   const handleResendEmail = async () => {
     try {
       setResendLoading(true);
-      await authAPI.resendOTP({ email });
+      const res = await authAPI.resendOTP({ email });
       setEmailResendTimer(60);
-      toast.success('Email OTP resent successfully!');
+      toast.success(res.data?.message || 'Email OTP resent successfully!');
+      // In development show the OTP so testers can proceed
+      if (res.data?.otp) {
+        console.info('Resent OTP (development):', res.data.otp);
+        toast.info(`OTP (dev): ${res.data.otp}`, { autoClose: 8000 });
+      }
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to resend email OTP';
       toast.error(message);

@@ -72,7 +72,9 @@ exports.register = async (req, res) => {
     // Send OTP via email (don't fail registration if email sending fails)
     let emailSent = true;
     try {
-      await sendOTPviaEmail(email, emailOTP);
+      console.log(`Registration: sending OTP to ${email} (OTP ${process.env.NODE_ENV === 'development' ? emailOTP : '[HIDDEN]'})`);
+      const sendResp = await sendOTPviaEmail(email, emailOTP);
+      console.log('Registration: sendOTPviaEmail response:', sendResp && sendResp.message ? sendResp.message : sendResp);
     } catch (err) {
       emailSent = false;
       console.error('Error sending OTP email during registration:', err.message || err);
@@ -192,9 +194,12 @@ exports.resendOTP = async (req, res) => {
 
     await user.save();
 
+    console.log(`Resend OTP requested for ${email} - generated OTP: ${process.env.NODE_ENV === 'development' ? emailOTP : '[HIDDEN]'}`);
+
     let emailSent = true;
     try {
-      await sendOTPviaEmail(email, emailOTP);
+      const sendResp = await sendOTPviaEmail(email, emailOTP);
+      console.log(`sendOTPviaEmail response for ${email}:`, sendResp && sendResp.message ? sendResp.message : sendResp);
     } catch (err) {
       emailSent = false;
       console.error('Error sending OTP email during resend:', err.message || err);
