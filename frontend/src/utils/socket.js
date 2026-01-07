@@ -1,6 +1,16 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
+const SOCKET_URL = (function () {
+  if (process.env.REACT_APP_SOCKET_URL) return process.env.REACT_APP_SOCKET_URL;
+  if (typeof window !== 'undefined' && window.location && !window.location.hostname.includes('localhost')) {
+    // Default to the frontend origin in deployed environments if no explicit socket URL provided
+    return window.location.origin;
+  }
+  // Development fallback
+  return 'http://localhost:5000';
+})();
+
+console.log('Socket service will attempt connection to:', SOCKET_URL);
 
 class SocketService {
   constructor() {

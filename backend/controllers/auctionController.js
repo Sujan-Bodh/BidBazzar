@@ -299,6 +299,35 @@ exports.toggleInterest = async (req, res) => {
 
     await auction.save();
 
+    // Emit private live notifications to seller and the acting user (buyer) so both get real-time updates
+    try {
+      const io = req.app.get('io');
+      const payload = {
+        auctionId: auction._id,
+        auctionTitle: auction.title,
+        userId: req.user._id,
+        username: req.user.username,
+        isInterested: !isInterested,
+        interestCount: auction.interestedUsers.length,
+        message: `${req.user.username} ${!isInterested ? 'is interested' : 'is no longer interested'} in your auction`,
+        timestamp: new Date(),
+      };
+
+      if (io) {
+        // Notify seller privately (works even if seller isn't viewing the auction)
+        const sellerId = auction.seller && auction.seller.toString();
+        if (sellerId && sellerId !== req.user._id.toString()) {
+          io.to(`user-${sellerId}`).emit('userInterested', payload);
+        }
+
+        // Notify the acting user to confirm the change
+        io.to(`user-${req.user._id.toString()}`).emit('userInterested', payload);
+        console.log('Interest notification emitted:', payload);
+      }
+    } catch (emitErr) {
+      console.error('Failed to emit interest notification:', emitErr);
+    }
+
     res.json({
       isInterested: !isInterested,
       interestCount: auction.interestedUsers.length,

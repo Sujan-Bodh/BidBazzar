@@ -19,9 +19,14 @@ const app = express();
 const server = http.createServer(app);
 
 // Socket.io setup
+const clientOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
+const allowedOrigins = clientOrigin.split(',').map(s => s.trim());
+
+console.log('Allowed client origins for CORS/socket:', allowedOrigins);
+
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -37,10 +42,16 @@ startAuctionScheduler(io);
 app.set('io', io);
 
 // Middleware
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+const corsOptions = {
+  origin: (origin, callback) => {
+    // allow non-browser requests like curl/postman
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
   credentials: true,
-}));
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
